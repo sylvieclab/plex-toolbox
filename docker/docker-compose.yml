@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: plex-toolbox-db
+    environment:
+      POSTGRES_USER: plextoolbox
+      POSTGRES_PASSWORD: plextoolbox
+      POSTGRES_DB: plextoolbox
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plextoolbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: plex-toolbox-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: backend
+    container_name: plex-toolbox-backend
+    environment:
+      - DATABASE_URL=postgresql://plextoolbox:plextoolbox@db:5432/plextoolbox
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../backend/app:/app/app
+      - backend_logs:/app/logs
+    restart: unless-stopped
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: backend
+    container_name: plex-toolbox-celery
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://plextoolbox:plextoolbox@db:5432/plextoolbox
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../backend/app:/app/app
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: frontend
+    container_name: plex-toolbox-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_logs:
