@@ -4,66 +4,132 @@ import {
   Box, 
   Grid, 
   Paper,
-  Card,
-  CardContent,
-  CardMedia,
   Button,
   CircularProgress,
   Alert,
   Chip,
   Stack,
-  Divider,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton
+  LinearProgress,
 } from '@mui/material';
 import {
   Movie as MovieIcon,
   Tv as TvIcon,
-  MusicNote as MusicIcon,
-  Photo as PhotoIcon,
-  Refresh as RefreshIcon,
-  Settings as SettingsIcon,
-  ViewList as ViewListIcon,
-  History as HistoryIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
+  Download as DownloadIcon,
+  Search as SearchIcon,
   Speed as SpeedIcon,
-  Close as CloseIcon
+  CheckCircle as CheckCircleIcon,
+  CloudDownload as CloudDownloadIcon,
+  VideoLibrary as VideoLibraryIcon,
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../services/api';
-import { DashboardStats, RecentItem, ServerStatus } from '../types';
-import ScanHistory from '../components/ScanHistory';
+
+interface DashboardData {
+  plex: {
+    total_libraries: number;
+    total_items: number;
+    by_type: {
+      movie: number;
+      show: number;
+      artist: number;
+      photo: number;
+    };
+  };
+  sabnzbd: {
+    active_downloads: number;
+    speed: string;
+    queue_size: string;
+    paused: boolean;
+  } | null;
+  sonarr: {
+    total_series: number;
+    missing_episodes: number;
+  } | null;
+  radarr: {
+    total_movies: number;
+    missing_movies: number;
+  } | null;
+  prowlarr: {
+    total_indexers: number;
+    enabled_indexers: number;
+  } | null;
+}
 
 const Dashboard = () => {
   const navigate = useNavigate();
   
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
-  const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Load all dashboard data in parallel
-      const [statsData, recentData, statusData] = await Promise.all([
-        apiClient.getDashboardStats(),
-        apiClient.getRecentItems(),
-        apiClient.getServerStatus()
-      ]);
+      // Load Plex stats
+      const plexStats = await apiClient.getDashboardStats();
 
-      setStats(statsData);
-      setRecentItems(recentData.items);
-      setServerStatus(statusData);
+      // Initialize data object
+      const dashboardData: DashboardData = {
+        plex: plexStats,
+        sabnzbd: null,
+        sonarr: null,
+        radarr: null,
+        prowlarr: null,
+      };
+
+      // Try to load SABnzbd data
+      try {
+        const sabnzbdStatus = await apiClient.getSabnzbdStatus();
+        const sabnzbdQueue = await apiClient.getSabnzbdQueue();
+        dashboardData.sabnzbd = {
+          active_downloads: sabnzbdQueue.queue?.slots?.length || 0,
+          speed: sabnzbdStatus.speed || '0 B/s',
+          queue_size: sabnzbdStatus.size_left || '0 B',
+          paused: sabnzbdStatus.paused || false,
+        };
+      } catch (err) {
+        console.log('SABnzbd not configured or unavailable');
+      }
+
+      // Try to load Sonarr data
+      try {
+        const sonarrSeries = await apiClient.getSonarrSeries();
+        const sonarrMissing = await apiClient.getSonarrMissing(1, 1);
+        dashboardData.sonarr = {
+          total_series: sonarrSeries.length,
+          missing_episodes: sonarrMissing.totalRecords || 0,
+        };
+      } catch (err) {
+        console.log('Sonarr not configured or unavailable');
+      }
+
+      // Try to load Radarr data
+      try {
+        const radarrMovies = await apiClient.getRadarrMovies();
+        const radarrMissing = await apiClient.getRadarrMissing();
+        dashboardData.radarr = {
+          total_movies: radarrMovies.length,
+          missing_movies: radarrMissing.length,
+        };
+      } catch (err) {
+        console.log('Radarr not configured or unavailable');
+      }
+
+      // Try to load Prowlarr data
+      try {
+        const prowlarrIndexers = await apiClient.getProwlarrIndexers();
+        dashboardData.prowlarr = {
+          total_indexers: prowlarrIndexers.length,
+          enabled_indexers: prowlarrIndexers.filter((i: any) => i.enable).length,
+        };
+      } catch (err) {
+        console.log('Prowlarr not configured or unavailable');
+      }
+
+      setData(dashboardData);
     } catch (err: any) {
       console.error('Error loading dashboard:', err);
       setError(err.response?.data?.detail || err.message || 'Failed to load dashboard data');
@@ -74,61 +140,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadDashboardData();
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(loadDashboardData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  const getTypeIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'movie':
-        return <MovieIcon sx={{ fontSize: 40, color: '#e50914' }} />;
-      case 'show':
-        return <TvIcon sx={{ fontSize: 40, color: '#2196f3' }} />;
-      case 'artist':
-      case 'album':
-      case 'track':
-        return <MusicIcon sx={{ fontSize: 40, color: '#4caf50' }} />;
-      case 'photo':
-        return <PhotoIcon sx={{ fontSize: 40, color: '#ff9800' }} />;
-      default:
-        return <ViewListIcon sx={{ fontSize: 40, color: '#757575' }} />;
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'movie':
-        return '#e50914';
-      case 'show':
-        return '#2196f3';
-      case 'artist':
-      case 'album':
-      case 'track':
-        return '#4caf50';
-      case 'photo':
-        return '#ff9800';
-      default:
-        return '#757575';
-    }
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Never';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    return date.toLocaleDateString();
-  };
-
-  if (loading) {
+  if (loading && !data) {
     return (
-      <Container maxWidth="lg">
+      <Container maxWidth="xl">
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
           <CircularProgress />
         </Box>
@@ -138,7 +158,7 @@ const Dashboard = () => {
 
   if (error) {
     return (
-      <Container maxWidth="lg">
+      <Container maxWidth="xl">
         <Box sx={{ py: 4 }}>
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -152,250 +172,250 @@ const Dashboard = () => {
   }
 
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="xl">
       <Box sx={{ py: 4 }}>
         {/* Header */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Dashboard
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Overview of your Plex media server
-          </Typography>
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="h4" gutterBottom>
+              Dashboard
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Overview of your media automation stack
+            </Typography>
+          </Box>
+          <Button variant="outlined" onClick={loadDashboardData}>
+            Refresh
+          </Button>
         </Box>
 
-        {/* Server Status Banner */}
-        {serverStatus && (
-          <Alert 
-            severity={serverStatus.connected ? "success" : "error"}
-            icon={serverStatus.connected ? <CheckCircleIcon /> : <ErrorIcon />}
-            sx={{ mb: 3 }}
-          >
-            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-              <Typography variant="body2">
-                <strong>{serverStatus.connected ? 'Connected' : 'Disconnected'}</strong>
-              </Typography>
-              {serverStatus.server_name && (
-                <>
-                  <Divider orientation="vertical" flexItem />
-                  <Typography variant="body2">
-                    Server: {serverStatus.server_name}
-                  </Typography>
-                </>
-              )}
-              {serverStatus.version && (
-                <>
-                  <Divider orientation="vertical" flexItem />
-                  <Typography variant="body2">
-                    Version: {serverStatus.version}
-                  </Typography>
-                </>
-              )}
-              {serverStatus.response_time_ms !== null && (
-                <>
-                  <Divider orientation="vertical" flexItem />
-                  <Typography variant="body2">
-                    <SpeedIcon sx={{ fontSize: 16, verticalAlign: 'middle', mr: 0.5 }} />
-                    Response: {serverStatus.response_time_ms}ms
-                  </Typography>
-                </>
-              )}
-            </Stack>
-          </Alert>
-        )}
-
-        {/* Stats Cards */}
+        {/* Plex Stats */}
+        <Typography variant="h5" sx={{ mb: 2 }}>
+          <VideoLibraryIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+          Plex Media Server
+        </Typography>
         <Grid container spacing={3} sx={{ mb: 4 }}>
-          {/* Total Libraries */}
           <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 3, textAlign: 'center', height: '100%' }}>
-              <ViewListIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h3" sx={{ mb: 1 }}>
-                {stats?.total_libraries || 0}
+            <Paper sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="h3" color="primary">
+                {data?.plex.total_libraries || 0}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Libraries
               </Typography>
             </Paper>
           </Grid>
-
-          {/* Total Items */}
           <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 3, textAlign: 'center', height: '100%' }}>
-              <MovieIcon sx={{ fontSize: 48, color: '#e50914', mb: 1 }} />
-              <Typography variant="h3" sx={{ mb: 1 }}>
-                {stats?.total_items.toLocaleString() || 0}
+            <Paper sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="h3" color="primary">
+                {data?.plex.total_items.toLocaleString() || 0}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Total Items
               </Typography>
             </Paper>
           </Grid>
-
-          {/* Recent Scans */}
           <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 3, textAlign: 'center', height: '100%' }}>
-              <HistoryIcon sx={{ fontSize: 48, color: '#4caf50', mb: 1 }} />
-              <Typography variant="h3" sx={{ mb: 1 }}>
-                {stats?.recent_scans || 0}
+            <Paper sx={{ p: 3, textAlign: 'center' }}>
+              <MovieIcon sx={{ fontSize: 40, color: '#e50914', mb: 1 }} />
+              <Typography variant="h4">
+                {data?.plex.by_type.movie || 0}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Scans (24h)
+                Movies
               </Typography>
             </Paper>
           </Grid>
-
-          {/* Last Scan */}
           <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 3, textAlign: 'center', height: '100%' }}>
-              <RefreshIcon sx={{ fontSize: 48, color: '#ff9800', mb: 1 }} />
-              <Typography variant="h6" sx={{ mb: 1, minHeight: '2em' }}>
-                {formatDate(stats?.last_scan || null)}
+            <Paper sx={{ p: 3, textAlign: 'center' }}>
+              <TvIcon sx={{ fontSize: 40, color: '#2196f3', mb: 1 }} />
+              <Typography variant="h4">
+                {data?.plex.by_type.show || 0}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Last Scan
+                TV Shows
               </Typography>
             </Paper>
           </Grid>
         </Grid>
 
-        {/* Library Breakdown */}
-        {stats && (
-          <Paper sx={{ p: 3, mb: 4 }}>
-            <Typography variant="h6" gutterBottom>
-              Library Breakdown
+        {/* SABnzbd Stats */}
+        {data?.sabnzbd && (
+          <>
+            <Typography variant="h5" sx={{ mb: 2 }}>
+              <DownloadIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+              Downloads (SABnzbd)
             </Typography>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              {stats.by_type.movie > 0 && (
-                <Grid item xs={6} sm={4} md={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <MovieIcon sx={{ fontSize: 40, color: '#e50914', mb: 1 }} />
-                    <Typography variant="h5">{stats.by_type.movie}</Typography>
-                    <Typography variant="body2" color="text.secondary">Movies</Typography>
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12} md={8}>
+                <Paper sx={{ p: 3 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                    <Typography variant="h6">Active Downloads</Typography>
+                    <Chip 
+                      label={data.sabnzbd.paused ? 'Paused' : 'Active'} 
+                      color={data.sabnzbd.paused ? 'default' : 'success'}
+                      size="small"
+                    />
+                  </Stack>
+                  <Box sx={{ mb: 2 }}>
+                    <Stack direction="row" justifyContent="space-between" mb={1}>
+                      <Typography variant="body2" color="text.secondary">
+                        {data.sabnzbd.active_downloads} item(s) in queue
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold">
+                        <SpeedIcon sx={{ fontSize: 16, verticalAlign: 'middle' }} /> {data.sabnzbd.speed}
+                      </Typography>
+                    </Stack>
+                    {data.sabnzbd.active_downloads > 0 && (
+                      <LinearProgress variant="indeterminate" />
+                    )}
                   </Box>
-                </Grid>
-              )}
-              {stats.by_type.show > 0 && (
-                <Grid item xs={6} sm={4} md={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <TvIcon sx={{ fontSize: 40, color: '#2196f3', mb: 1 }} />
-                    <Typography variant="h5">{stats.by_type.show}</Typography>
-                    <Typography variant="body2" color="text.secondary">TV Shows</Typography>
-                  </Box>
-                </Grid>
-              )}
-              {stats.by_type.artist > 0 && (
-                <Grid item xs={6} sm={4} md={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <MusicIcon sx={{ fontSize: 40, color: '#4caf50', mb: 1 }} />
-                    <Typography variant="h5">{stats.by_type.artist}</Typography>
-                    <Typography variant="body2" color="text.secondary">Music</Typography>
-                  </Box>
-                </Grid>
-              )}
-              {stats.by_type.photo > 0 && (
-                <Grid item xs={6} sm={4} md={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <PhotoIcon sx={{ fontSize: 40, color: '#ff9800', mb: 1 }} />
-                    <Typography variant="h5">{stats.by_type.photo}</Typography>
-                    <Typography variant="body2" color="text.secondary">Photos</Typography>
-                  </Box>
-                </Grid>
-              )}
-              {stats.by_type.other > 0 && (
-                <Grid item xs={6} sm={4} md={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <ViewListIcon sx={{ fontSize: 40, color: '#757575', mb: 1 }} />
-                    <Typography variant="h5">{stats.by_type.other}</Typography>
-                    <Typography variant="body2" color="text.secondary">Other</Typography>
-                  </Box>
-                </Grid>
-              )}
+                  <Typography variant="body2" color="text.secondary">
+                    Queue Size: {data.sabnzbd.queue_size}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Paper sx={{ p: 3, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <CloudDownloadIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+                  <Typography variant="h3" color="primary">
+                    {data.sabnzbd.active_downloads}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Active Downloads
+                  </Typography>
+                </Paper>
+              </Grid>
             </Grid>
-          </Paper>
+          </>
         )}
 
-        {/* Recently Added */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">
-              Recently Added
+        {/* Sonarr & Radarr Stats */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {data?.sonarr && (
+            <Grid item xs={12} md={6}>
+              <Typography variant="h5" sx={{ mb: 2 }}>
+                <TvIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                Sonarr (TV Shows)
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 3, textAlign: 'center' }}>
+                    <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                    <Typography variant="h4">
+                      {data.sonarr.total_series}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Series
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 3, textAlign: 'center' }}>
+                    <SearchIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+                    <Typography variant="h4" color="warning.main">
+                      {data.sonarr.missing_episodes}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Missing Episodes
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Grid>
+          )}
+
+          {data?.radarr && (
+            <Grid item xs={12} md={6}>
+              <Typography variant="h5" sx={{ mb: 2 }}>
+                <MovieIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                Radarr (Movies)
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 3, textAlign: 'center' }}>
+                    <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                    <Typography variant="h4">
+                      {data.radarr.total_movies}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Movies
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 3, textAlign: 'center' }}>
+                    <SearchIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+                    <Typography variant="h4" color="warning.main">
+                      {data.radarr.missing_movies}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Missing Movies
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Grid>
+          )}
+        </Grid>
+
+        {/* Prowlarr Stats */}
+        {data?.prowlarr && (
+          <>
+            <Typography variant="h5" sx={{ mb: 2 }}>
+              <SearchIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+              Prowlarr (Indexers)
+            </Typography>
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12} sm={6}>
+                <Paper sx={{ p: 3, textAlign: 'center' }}>
+                  <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                  <Typography variant="h4">
+                    {data.prowlarr.enabled_indexers}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Enabled Indexers
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Paper sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="h4">
+                    {data.prowlarr.total_indexers}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Total Indexers
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+          </>
+        )}
+
+        {/* Missing Integrations Alert */}
+        {(!data?.sabnzbd || !data?.sonarr || !data?.radarr || !data?.prowlarr) && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="body2" gutterBottom>
+              <strong>Configure More Integrations</strong>
+            </Typography>
+            <Typography variant="body2">
+              Add integrations for {[
+                !data?.sabnzbd && 'SABnzbd',
+                !data?.sonarr && 'Sonarr',
+                !data?.radarr && 'Radarr',
+                !data?.prowlarr && 'Prowlarr',
+              ].filter(Boolean).join(', ')} to see more stats on your dashboard.
             </Typography>
             <Button 
               size="small" 
-              startIcon={<RefreshIcon />}
-              onClick={loadDashboardData}
+              variant="outlined" 
+              sx={{ mt: 1 }}
+              onClick={() => navigate('/integrations')}
             >
-              Refresh
+              Go to Integrations
             </Button>
-          </Box>
-          
-          {recentItems.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
-              No recently added items
-            </Typography>
-          ) : (
-            <Grid container spacing={2}>
-              {recentItems.map((item, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <Card sx={{ display: 'flex', height: 120 }}>
-                    {item.thumb ? (
-                      <CardMedia
-                        component="img"
-                        sx={{ width: 80, objectFit: 'cover' }}
-                        image={item.thumb}
-                        alt={item.title}
-                      />
-                    ) : (
-                      <Box 
-                        sx={{ 
-                          width: 80, 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          bgcolor: 'grey.800'
-                        }}
-                      >
-                        {getTypeIcon(item.type)}
-                      </Box>
-                    )}
-                    <CardContent sx={{ flex: 1, py: 1.5, px: 2 }}>
-                      <Typography variant="subtitle2" noWrap sx={{ fontWeight: 600, mb: 0.5 }}>
-                        {item.title}
-                      </Typography>
-                      <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
-                        <Chip 
-                          label={item.type} 
-                          size="small" 
-                          sx={{ 
-                            height: 20,
-                            fontSize: '0.7rem',
-                            bgcolor: getTypeColor(item.type),
-                            color: 'white'
-                          }} 
-                        />
-                        {item.year && (
-                          <Chip 
-                            label={item.year} 
-                            size="small" 
-                            variant="outlined"
-                            sx={{ height: 20, fontSize: '0.7rem' }}
-                          />
-                        )}
-                      </Stack>
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        {item.library}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        {formatDate(item.added_at)}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          )}
-        </Paper>
+          </Alert>
+        )}
 
         {/* Quick Actions */}
         <Paper sx={{ p: 3 }}>
@@ -406,8 +426,7 @@ const Dashboard = () => {
             <Grid item xs={12} sm={6} md={3}>
               <Button
                 fullWidth
-                variant="contained"
-                startIcon={<ViewListIcon />}
+                variant="outlined"
                 onClick={() => navigate('/libraries')}
                 sx={{ py: 1.5 }}
               >
@@ -418,29 +437,26 @@ const Dashboard = () => {
               <Button
                 fullWidth
                 variant="outlined"
-                startIcon={<HistoryIcon />}
-                onClick={() => setHistoryModalOpen(true)}
+                onClick={() => navigate('/integrations')}
                 sx={{ py: 1.5 }}
               >
-                Scan History
+                Manage Integrations
               </Button>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <Button
                 fullWidth
                 variant="outlined"
-                startIcon={<RefreshIcon />}
                 onClick={loadDashboardData}
                 sx={{ py: 1.5 }}
               >
-                Refresh Data
+                Refresh Dashboard
               </Button>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <Button
                 fullWidth
                 variant="outlined"
-                startIcon={<SettingsIcon />}
                 onClick={() => navigate('/settings')}
                 sx={{ py: 1.5 }}
               >
@@ -450,29 +466,6 @@ const Dashboard = () => {
           </Grid>
         </Paper>
       </Box>
-
-      {/* Scan History Modal */}
-      <Dialog 
-        open={historyModalOpen} 
-        onClose={() => setHistoryModalOpen(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6">Scan History</Typography>
-            <IconButton onClick={() => setHistoryModalOpen(false)} size="small">
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <ScanHistory limit={50} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setHistoryModalOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 };

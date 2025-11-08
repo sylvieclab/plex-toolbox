@@ -18,6 +18,8 @@ import {
   Dashboard as DashboardIcon,
   VideoLibrary as VideoLibraryIcon,
   Settings as SettingsIcon,
+  Extension as ExtensionIcon,
+  BarChart as BarChartIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store';
@@ -36,6 +38,8 @@ const Layout = ({ children }: LayoutProps) => {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Libraries', icon: <VideoLibraryIcon />, path: '/libraries' },
+    { text: 'Statistics', icon: <BarChartIcon />, path: '/statistics' },
+    { text: 'Integrations', icon: <ExtensionIcon />, path: '/integrations' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
   ];
 
@@ -64,7 +68,7 @@ const Layout = ({ children }: LayoutProps) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div">
-            Plex Toolbox
+            Totarr
           </Typography>
         </Toolbar>
       </AppBar>

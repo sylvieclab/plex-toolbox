@@ -36,6 +36,6 @@ def get_db():
 def init_db():
     """Initialize database tables"""
     from app.models.base import Base
-    from app.models import plex  # Import all models
+    from app.models import plex, integrations  # Import all models
     
     Base.metadata.create_all(bind=engine)

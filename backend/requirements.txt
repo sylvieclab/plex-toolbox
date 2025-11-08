@@ -7,9 +7,10 @@ pydantic-settings==2.1.0
 # Plex integration
 PlexAPI==4.15.6
 
-# Database - SQLAlchemy only (no PostgreSQL driver for simple setup)
+# Database
 sqlalchemy==2.0.23
 alembic==1.13.1
+psycopg2-binary==2.9.9  # PostgreSQL driver - ADDED FOR TIMESCALEDB
 
 # HTTP client
 httpx==0.26.0

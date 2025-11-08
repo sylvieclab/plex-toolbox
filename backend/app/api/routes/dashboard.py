@@ -101,8 +101,8 @@ async def get_recently_added():
         recent_items = []
         
         try:
-            # Get all recently added items from the server
-            all_recent = server.library.recentlyAdded(maxresults=10)
+            # Get all recently added items from the server - FIXED: maxResults (capital R)
+            all_recent = server.library.recentlyAdded(maxResults=10)
             
             for item in all_recent:
                 # Get library name safely

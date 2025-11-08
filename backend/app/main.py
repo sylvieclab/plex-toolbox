@@ -5,14 +5,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 import os
+import sys
+
+# Run initialization before anything else
+from app.core.init import initialize
+
+if not initialize():
+    logger.error("Failed to initialize application - exiting")
+    sys.exit(1)
 
 from app.core.config import settings
-from app.api.routes import health, plex, library, scanning, dashboard
+from app.api.routes import health, plex, library, scanning, dashboard, integrations, sabnzbd, sonarr, radarr, prowlarr, statistics
 
 # Configure logger - create logs directory if it doesn't exist
 os.makedirs("logs", exist_ok=True)
 logger.add(
-    "logs/plex-toolbox.log",
+    "logs/totarr.log",
     rotation="500 MB",
     retention="10 days",
     level="INFO"
@@ -20,7 +28,7 @@ logger.add(
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="Advanced management tools for Plex Media Server",
+    description="Advanced management and monitoring for Plex, Jellyfin, and the *arr ecosystem",
     version="0.1.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -42,14 +50,26 @@ app.include_router(plex.router, prefix="/api/plex", tags=["plex"])
 app.include_router(library.router, prefix="/api/library", tags=["library"])
 app.include_router(scanning.router, prefix="/api/scan", tags=["scanning"])
 app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
+app.include_router(integrations.router, prefix="/api", tags=["integrations"])
+app.include_router(sabnzbd.router, prefix="/api", tags=["sabnzbd"])
+app.include_router(sonarr.router, prefix="/api", tags=["sonarr"])
+app.include_router(radarr.router, prefix="/api", tags=["radarr"])
+app.include_router(prowlarr.router, prefix="/api", tags=["prowlarr"])
+app.include_router(statistics.router, prefix="/api", tags=["statistics"])
 
 
 @app.on_event("startup")
 async def startup_event():
     """Application startup tasks"""
-    logger.info("Starting Plex Toolbox application")
+    logger.info("Starting Totarr application")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
-    logger.info(f"Database: {settings.DATABASE_URL}")
+    logger.info(f"Database: {settings.DATABASE_URL.split('@')[1] if '@' in settings.DATABASE_URL else 'SQLite'}")
+    
+    # Log all registered routes for debugging
+    logger.info("Registered routes:")
+    for route in app.routes:
+        if hasattr(route, 'path'):
+            logger.info(f"  {route.methods if hasattr(route, 'methods') else 'N/A'} {route.path}")
     
     # Initialize database tables
     try:
@@ -84,7 +104,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Application shutdown tasks"""
-    logger.info("Shutting down Plex Toolbox application")
+    logger.info("Shutting down Totarr application")
 
 
 if __name__ == "__main__":

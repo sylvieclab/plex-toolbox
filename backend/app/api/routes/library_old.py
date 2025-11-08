@@ -5,6 +5,8 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from datetime import datetime
 from loguru import logger
+import os
+from pathlib import Path
 
 from app.schemas.plex import (
     PlexLibrary,
@@ -105,7 +107,7 @@ async def get_library_details(library_key: str):
             key=str(library.key),
             title=library.title,
             type=library.type,
-            agent=library.agent if hasattr(library, 'agent') else None,
+            agent=library.agent if hasattr(lib, 'agent') else None,
             scanner=library.scanner if hasattr(library, 'scanner') else None,
             language=library.language if hasattr(library, 'language') else None,
             uuid=library.uuid,
@@ -220,69 +222,77 @@ async def get_library_directories(
     path: str = "/"
 ):
     """
-    Browse library structure using Plex API (not filesystem)
+    List directories within a library
     
-    For TV Shows: / → Shows → Seasons
-    For Movies: / → Movies (no deeper)
+    Security: MUST validate paths to prevent traversal attacks
     """
     try:
         server = plex_connection.get_connection()
         library = server.library.sectionByID(int(library_key))
         
-        logger.info(f"Browsing library: {library.title} (type: {library.type}), path: {path}")
+        # Get library base locations
+        locations = library.locations
+        if not locations:
+            raise HTTPException(status_code=404, detail="No library locations found")
         
+        base_location = locations[0]  # Use first location
+        logger.info(f"Library base location: {base_location}")
+        
+        # CRITICAL: Validate path to prevent ../../../ attacks
+        clean_path = os.path.normpath(path.lstrip('/'))
+        if '..' in clean_path or clean_path.startswith('/'):
+            raise HTTPException(status_code=400, detail="Invalid path")
+        
+        # Build full path
+        if clean_path == '.':
+            full_path = base_location
+        else:
+            full_path = os.path.join(base_location, clean_path)
+        
+        # Ensure path is within library location
+        if not full_path.startswith(base_location):
+            raise HTTPException(status_code=400, detail="Path outside library")
+        
+        # List directories
         directories = []
+        logger.info(f"Checking path: {full_path}")
+        logger.info(f"Path exists: {os.path.exists(full_path)}")
+        logger.info(f"Is directory: {os.path.isdir(full_path)}")
         
-        if path == '/':
-            # Root level - list all shows/movies
-            items = library.all()
-            logger.info(f"Found {len(items)} items at root level")
+        if os.path.exists(full_path) and os.path.isdir(full_path):
+            items = os.listdir(full_path)
+            logger.info(f"Found {len(items)} items in directory")
             
             for item in items:
-                directories.append({
-                    "name": item.title,
-                    "path": f"/{item.title}",
-                    "full_path": item.title,
-                    "is_directory": True
-                })
-        else:
-            # Navigate deeper
-            path_parts = [p for p in path.split('/') if p]
-            
-            if len(path_parts) == 1 and library.type == 'show':
-                # Show level - list seasons
-                show_title = path_parts[0]
-                items = library.all()
-                show = next((s for s in items if s.title == show_title), None)
+                item_path = os.path.join(full_path, item)
+                is_dir = os.path.isdir(item_path)
+                logger.debug(f"Item: {item}, is_dir: {is_dir}")
                 
-                if show and hasattr(show, 'seasons'):
-                    for season in show.seasons():
-                        directories.append({
-                            "name": season.title,
-                            "path": f"/{show_title}/{season.title}",
-                            "full_path": f"{show_title}/{season.title}",
-                            "is_directory": True
-                        })
-                    logger.info(f"Found {len(directories)} seasons for {show_title}")
+                if is_dir:
+                    rel_path = os.path.join(clean_path if clean_path != '.' else '', item)
+                    directories.append({
+                        "name": item,
+                        "path": rel_path.replace('\\', '/'),  # Normalize for frontend
+                        "full_path": item_path,
+                        "is_directory": True
+                    })
+        
+        logger.info(f"Returning {len(directories)} directories")
         
         # Sort by name
         directories.sort(key=lambda x: x['name'].lower())
         
         # Calculate parent path
         parent_path = None
-        if path != '/':
-            parts = [p for p in path.split('/') if p]
-            if len(parts) > 1:
-                parent_path = '/' + '/'.join(parts[:-1])
-            else:
+        if clean_path and clean_path != '.':
+            parent_path = str(Path(clean_path).parent).replace('\\', '/')
+            if parent_path == '.':
                 parent_path = '/'
-        
-        logger.info(f"Returning {len(directories)} directories")
         
         return {
             "library_key": library_key,
             "library_name": library.title,
-            "current_path": path,
+            "current_path": '/' + clean_path if clean_path != '.' else '/',
             "parent_path": parent_path,
             "directories": directories
         }

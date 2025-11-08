@@ -1,6 +1,6 @@
-# Plex Toolbox
+# Totarr
 
-Advanced management tools for Plex Media Server
+Advanced management and monitoring for Plex, Jellyfin, and the *arr ecosystem (Radarr, Sonarr, SABnzbd, Prowlarr)
 
 ## Current Status
 
@@ -12,11 +12,15 @@ Advanced management tools for Plex Media Server
 - Enhanced Libraries Page - Search, filter, sort with beautiful cards
 - Scan History Tracking - Complete history of all library scans
 - Library Management - View and scan all your libraries
+- Statistics Dashboard - Real-time monitoring of all *arr services
+- Integration Management - Centralized control of Radarr, Sonarr, SABnzbd, Prowlarr
 - Modern UI - Dark theme matching Plex aesthetic
 
 ### Planned Features
 - Dashboard Enhancements (Priority 4)
 - Advanced Scanning Features (Priority 5)
+- Jellyfin Integration
+- Historical Statistics & Trends
 
 ---
 
@@ -26,13 +30,14 @@ Advanced management tools for Plex Media Server
 - Python 3.8+
 - Node.js 16+
 - Plex Media Server with authentication token
+- Optional: Radarr, Sonarr, SABnzbd, Prowlarr
 
 ### Installation
 
 1. Clone the repository
    ```bash
    git clone <your-repo-url>
-   cd plex-toolbox
+   cd totarr
    ```
 
 2. Start the application
@@ -40,9 +45,10 @@ Advanced management tools for Plex Media Server
    start-simple.bat
    ```
 
-3. Configure Plex
+3. Configure Services
    - Open http://localhost:3000
    - Enter your Plex server URL and token
+   - Add your *arr integrations (optional)
    - Configuration persists automatically
 
 ### Access Points
@@ -58,6 +64,8 @@ Advanced management tools for Plex Media Server
 - ✓ Database Persistence - Configuration management
 - ✓ Enhanced Libraries - Search, filter, sort with visual cards
 - ✓ Scan History - Track all library scans with status
+- ✓ Statistics Dashboard - Real-time monitoring across all services
+- ✓ Integration Management - Centralized *arr app control
 - Planned: Dashboard Stats - Overview and quick actions
 
 ### Phase 2: Advanced Features
@@ -65,6 +73,7 @@ Advanced management tools for Plex Media Server
 - Directory Scanning - Scan specific folders
 - Duplicate Media Finder - Find and remove duplicates
 - Metadata Management - Bulk edit metadata and artwork
+- Historical Statistics - Time-series data with TimescaleDB
 
 ### Phase 3: Automation
 - Scheduled Scans - Automatic recurring scans
@@ -72,7 +81,7 @@ Advanced management tools for Plex Media Server
 - Notifications - Email/Discord/Slack alerts
 
 ### Phase 4: Integrations
-- Sonarr/Radarr - Integration with *arr stack
+- Jellyfin - Complete Jellyfin support
 - Overseerr - Request management
 - Webhooks - Custom event triggers
 
@@ -84,7 +93,8 @@ Advanced management tools for Plex Media Server
 - FastAPI - Modern Python web framework
 - SQLAlchemy - Database ORM
 - PlexAPI - Plex server integration
-- SQLite - Local database
+- SQLite/PostgreSQL - Database options
+- TimescaleDB - Time-series statistics (optional)
 
 ### Frontend
 - React 18 - UI framework
@@ -114,13 +124,13 @@ npm start
 
 ### Project Structure
 ```
-plex-toolbox/
+totarr/
 ├── backend/          # Python FastAPI backend
 │   ├── app/
 │   │   ├── api/      # API routes
 │   │   ├── models/   # Database models
 │   │   └── services/ # Business logic
-│   └── plex_toolbox.db  # SQLite database
+│   └── totarr.db     # SQLite database
 └── frontend/         # React TypeScript frontend
     └── src/
         ├── pages/    # Page components
@@ -148,8 +158,8 @@ npm install
 ### Database Issues
 ```bash
 cd backend
-del plex_toolbox.db  # Windows
-rm plex_toolbox.db   # Linux/Mac
+del totarr.db  # Windows
+rm totarr.db   # Linux/Mac
 # Restart backend - database will recreate
 ```
 
@@ -175,7 +185,9 @@ MIT License - See LICENSE file for details
 ## Acknowledgments
 
 - **Plex** - For the amazing media server
+- **Jellyfin** - Open-source media system
 - **PlexAPI** - Python library for Plex integration
+- **The *arr Community** - Radarr, Sonarr, Prowlarr, and all the automation tools
 - **FastAPI** - Modern Python web framework
 - **React** - UI library
 - **Material-UI** - Component library
@@ -191,8 +203,8 @@ For issues or questions:
 
 ---
 
-**Built for Plex enthusiasts**
+**Built for media enthusiasts and self-hosters**
 
-*Last Updated: 2025-11-04*  
+*Last Updated: 2025-11-08*  
 *Version: 0.3.0*  
 *Status: Priorities 1-3 Complete - Working Application*

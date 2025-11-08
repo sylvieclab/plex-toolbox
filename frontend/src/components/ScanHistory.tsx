@@ -14,7 +14,7 @@ import {
   Tooltip,
   CircularProgress,
 } from '@mui/material';
-import { Delete, CheckCircle, Error, HourglassEmpty } from '@mui/icons-material';
+import { Delete, CheckCircle, Error, HourglassEmpty, FolderOpen, LibraryBooks } from '@mui/icons-material';
 import { apiClient } from '../services/api';
 import { ScanHistory as ScanHistoryType } from '../types';
 
@@ -80,6 +80,10 @@ const ScanHistory = ({ libraryKey, limit = 20 }: ScanHistoryProps) => {
         return 'default';
     }
   };
+  
+  const getScanTypeColor = (scanType: string) => {
+    return scanType === 'partial' ? 'secondary' : 'primary';
+  };
 
   const formatDuration = (seconds?: number) => {
     if (!seconds) return 'N/A';
@@ -91,6 +95,12 @@ const ScanHistory = ({ libraryKey, limit = 20 }: ScanHistoryProps) => {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
+  };
+  
+  const truncatePath = (path?: string, maxLength: number = 30) => {
+    if (!path) return 'Entire library';
+    if (path.length <= maxLength) return path;
+    return '...' + path.slice(-maxLength);
   };
 
   if (loading) {
@@ -123,7 +133,8 @@ const ScanHistory = ({ libraryKey, limit = 20 }: ScanHistoryProps) => {
         <TableHead>
           <TableRow>
             <TableCell>Library</TableCell>
-            <TableCell>Type</TableCell>
+            <TableCell>Scope</TableCell>
+            <TableCell>Path</TableCell>
             <TableCell>Status</TableCell>
             <TableCell>Started</TableCell>
             <TableCell>Duration</TableCell>
@@ -137,13 +148,28 @@ const ScanHistory = ({ libraryKey, limit = 20 }: ScanHistoryProps) => {
                 <Typography variant="body2" fontWeight="medium">
                   {scan.library_name}
                 </Typography>
-              </TableCell>
-              <TableCell>
                 <Chip 
                   label={scan.library_type} 
                   size="small" 
                   variant="outlined"
+                  sx={{ mt: 0.5 }}
                 />
+              </TableCell>
+              <TableCell>
+                <Chip 
+                  icon={scan.scan_type === 'partial' ? <FolderOpen /> : <LibraryBooks />}
+                  label={scan.scan_type === 'partial' ? 'Partial' : 'Full'} 
+                  size="small"
+                  color={getScanTypeColor(scan.scan_type) as any}
+                  variant="filled"
+                />
+              </TableCell>
+              <TableCell>
+                <Tooltip title={scan.path || 'Entire library'}>
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                    {truncatePath(scan.path)}
+                  </Typography>
+                </Tooltip>
               </TableCell>
               <TableCell>
                 <Box display="flex" alignItems="center" gap={1}>
@@ -161,7 +187,7 @@ const ScanHistory = ({ libraryKey, limit = 20 }: ScanHistoryProps) => {
                 </Typography>
               </TableCell>
               <TableCell>
-                <Typography variant="body2">
+                <Typography variant="body2" fontWeight={scan.scan_type === 'partial' ? 'bold' : 'normal'}>
                   {formatDuration(scan.duration_seconds)}
                 </Typography>
               </TableCell>

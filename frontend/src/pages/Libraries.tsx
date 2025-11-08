@@ -31,10 +31,12 @@ import {
   Search as SearchIcon,
   Storage,
   History,
+  FolderOpen,
 } from '@mui/icons-material';
 import { apiClient } from '../services/api';
 import { PlexLibrary } from '../types';
 import ScanHistory from '../components/ScanHistory';
+import DirectoryBrowser from '../components/DirectoryBrowser';
 
 const Libraries = () => {
   const [libraries, setLibraries] = useState<PlexLibrary[]>([]);
@@ -54,6 +56,12 @@ const Libraries = () => {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedLibraryKey, setSelectedLibraryKey] = useState<string | undefined>();
   const [selectedLibraryName, setSelectedLibraryName] = useState<string>('');
+  
+  // Directory browser states
+  const [browserModalOpen, setBrowserModalOpen] = useState(false);
+  const [browserLibraryKey, setBrowserLibraryKey] = useState<string>('');
+  const [browserLibraryName, setBrowserLibraryName] = useState<string>('');
+  const [browserLibraryType, setBrowserLibraryType] = useState<string>('');
 
   // Fetch libraries on mount
   useEffect(() => {
@@ -140,6 +148,21 @@ const Libraries = () => {
         return next;
       });
     }
+  };
+  
+  const handleOpenBrowser = (library: PlexLibrary) => {
+    setBrowserLibraryKey(library.key);
+    setBrowserLibraryName(library.title);
+    setBrowserLibraryType(library.type);
+    setBrowserModalOpen(true);
+  };
+  
+  const handleScanComplete = () => {
+    fetchLibraries();
+    setNotification({
+      type: 'success',
+      message: 'Scan completed successfully!',
+    });
   };
 
   const getLibraryIcon = (type: string) => {
@@ -396,35 +419,52 @@ const Libraries = () => {
                     </Box>
 
                     {/* Actions */}
-                    <Box display="flex" gap={1}>
+                    <Box display="flex" flexDirection="column" gap={1}>
+                      <Box display="flex" gap={1}>
+                        <Button
+                          variant="outlined"
+                          startIcon={isScanning ? <CircularProgress size={16} /> : <Refresh />}
+                          onClick={() => handleScan(library)}
+                          disabled={isScanning}
+                          fullWidth
+                          sx={{
+                            borderColor: getLibraryColor(library.type),
+                            color: getLibraryColor(library.type),
+                            '&:hover': {
+                              borderColor: getLibraryColor(library.type),
+                              backgroundColor: `${getLibraryColor(library.type)}20`,
+                            },
+                          }}
+                        >
+                          {isScanning ? 'Scanning...' : 'Scan All'}
+                        </Button>
+                        <Button
+                          variant="text"
+                          size="small"
+                          startIcon={<History />}
+                          onClick={() => {
+                            setSelectedLibraryKey(library.key);
+                            setSelectedLibraryName(library.title);
+                            setHistoryModalOpen(true);
+                          }}
+                        >
+                          History
+                        </Button>
+                      </Box>
                       <Button
-                        variant="outlined"
-                        startIcon={isScanning ? <CircularProgress size={16} /> : <Refresh />}
-                        onClick={() => handleScan(library)}
-                        disabled={isScanning}
+                        variant="contained"
+                        startIcon={<FolderOpen />}
+                        onClick={() => handleOpenBrowser(library)}
                         fullWidth
                         sx={{
-                          borderColor: getLibraryColor(library.type),
-                          color: getLibraryColor(library.type),
+                          backgroundColor: getLibraryColor(library.type),
                           '&:hover': {
-                            borderColor: getLibraryColor(library.type),
-                            backgroundColor: `${getLibraryColor(library.type)}20`,
+                            backgroundColor: getLibraryColor(library.type),
+                            filter: 'brightness(0.9)',
                           },
                         }}
                       >
-                        {isScanning ? 'Scanning...' : 'Scan Library'}
-                      </Button>
-                      <Button
-                        variant="text"
-                        size="small"
-                        startIcon={<History />}
-                        onClick={() => {
-                          setSelectedLibraryKey(library.key);
-                          setSelectedLibraryName(library.title);
-                          setHistoryModalOpen(true);
-                        }}
-                      >
-                        History
+                        Browse & Scan
                       </Button>
                     </Box>
                   </CardContent>
@@ -471,6 +511,16 @@ const Libraries = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      
+      {/* Directory Browser Modal */}
+      <DirectoryBrowser
+        open={browserModalOpen}
+        onClose={() => setBrowserModalOpen(false)}
+        libraryKey={browserLibraryKey}
+        libraryName={browserLibraryName}
+        libraryType={browserLibraryType}
+        onScanComplete={handleScanComplete}
+      />
     </Container>
   );
 };

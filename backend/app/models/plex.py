@@ -1,7 +1,7 @@
 """
 Plex server configuration model
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float
 from app.models.base import Base, TimestampMixin
 
 
@@ -33,12 +33,13 @@ class ScanHistory(Base, TimestampMixin):
     library_key = Column(String, nullable=False)
     library_name = Column(String, nullable=False)
     library_type = Column(String, nullable=False)  # 'movie', 'show', 'music', etc.
-    scan_type = Column(String, nullable=False)  # 'full' or 'partial'
+    scan_type = Column(String, nullable=False, default='full')  # 'full' or 'partial'
     path = Column(String, nullable=True)  # Specific path if partial scan
     status = Column(String, nullable=False)  # 'started', 'completed', 'failed'
     error_message = Column(String, nullable=True)
     started_at = Column(DateTime, nullable=False)
     completed_at = Column(DateTime, nullable=True)
+    duration_seconds = Column(Float, nullable=True)  # NEW: Duration in seconds
 
 
 class UserSettings(Base, TimestampMixin):

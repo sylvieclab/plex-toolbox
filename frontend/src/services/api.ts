@@ -11,6 +11,7 @@ import {
   DashboardStats,
   RecentItemsResponse,
   ServerStatus,
+  DirectoryListing,
 } from '../types';
 
 class ApiClient {
@@ -90,6 +91,41 @@ class ApiClient {
     return response.data;
   }
 
+  // Directory browsing
+  async getLibraryDirectories(
+    libraryKey: string,
+    path: string = '/'
+  ): Promise<DirectoryListing> {
+    const response = await this.client.get<DirectoryListing>(
+      `/library/libraries/${libraryKey}/directories`,
+      { params: { path } }
+    );
+    return response.data;
+  }
+
+  // Scan with optional path
+  async scanLibraryPath(
+    libraryKey: string,
+    path?: string
+  ): Promise<{ 
+    status: string; 
+    message: string;
+    scan_id: number;
+    scan_type: string;
+    path?: string;
+    library_key: string;
+    library_name: string;
+    started_at: string;
+    completed_at?: string;
+    duration_seconds?: number;
+  }> {
+    const response = await this.client.post(
+      `/scan/libraries/${libraryKey}/scan`,
+      { path }
+    );
+    return response.data;
+  }
+
   // Scan history
   async getScanHistory(libraryKey?: string, limit: number = 50): Promise<ScanHistoryResponse> {
     const params = new URLSearchParams();
@@ -133,6 +169,127 @@ class ApiClient {
 
   async getServerStatus(): Promise<ServerStatus> {
     const response = await this.client.get<ServerStatus>('/dashboard/server-status');
+    return response.data;
+  }
+
+  // Plex activities
+  async getPlexActivities(): Promise<{ activities: any[] }> {
+    const response = await this.client.get('/scan/plex-activities');
+    return response.data;
+  }
+
+  // Integration Management
+  async testIntegration(data: any): Promise<any> {
+    const response = await this.client.post('/integrations/test', data);
+    return response.data;
+  }
+
+  async createIntegration(data: any): Promise<any> {
+    const response = await this.client.post('/integrations', data);
+    return response.data;
+  }
+
+  async getIntegrations(serviceType?: string): Promise<any[]> {
+    const params = serviceType ? { service_type: serviceType } : {};
+    const response = await this.client.get('/integrations', { params });
+    return response.data;
+  }
+
+  async getIntegration(id: number): Promise<any> {
+    const response = await this.client.get(`/integrations/${id}`);
+    return response.data;
+  }
+
+  async updateIntegration(id: number, data: any): Promise<any> {
+    const response = await this.client.put(`/integrations/${id}`, data);
+    return response.data;
+  }
+
+  async deleteIntegration(id: number): Promise<void> {
+    await this.client.delete(`/integrations/${id}`);
+  }
+
+  // SABnzbd
+  async getSabnzbdQueue(): Promise<any> {
+    const response = await this.client.get('/sabnzbd/queue');
+    return response.data;
+  }
+
+  async getSabnzbdHistory(limit: number = 50): Promise<any> {
+    const response = await this.client.get('/sabnzbd/history', { params: { limit } });
+    return response.data;
+  }
+
+  async pauseSabnzbd(): Promise<any> {
+    const response = await this.client.post('/sabnzbd/pause');
+    return response.data;
+  }
+
+  async resumeSabnzbd(): Promise<any> {
+    const response = await this.client.post('/sabnzbd/resume');
+    return response.data;
+  }
+
+  async getSabnzbdStatus(): Promise<any> {
+    const response = await this.client.get('/sabnzbd/status');
+    return response.data;
+  }
+
+  // Sonarr
+  async getSonarrSeries(): Promise<any[]> {
+    const response = await this.client.get('/sonarr/series');
+    return response.data;
+  }
+
+  async getSonarrMissing(page: number = 1, pageSize: number = 50): Promise<any> {
+    const response = await this.client.get('/sonarr/missing', { params: { page, page_size: pageSize } });
+    return response.data;
+  }
+
+  async searchSonarrEpisodes(episodeIds: number[]): Promise<any> {
+    const response = await this.client.post('/sonarr/search', episodeIds);
+    return response.data;
+  }
+
+  async getSonarrQueue(): Promise<any> {
+    const response = await this.client.get('/sonarr/queue');
+    return response.data;
+  }
+
+  // Radarr
+  async getRadarrMovies(): Promise<any[]> {
+    const response = await this.client.get('/radarr/movies');
+    return response.data;
+  }
+
+  async getRadarrMissing(): Promise<any[]> {
+    const response = await this.client.get('/radarr/missing');
+    return response.data;
+  }
+
+  async searchRadarrMovies(movieIds: number[]): Promise<any> {
+    const response = await this.client.post('/radarr/search', movieIds);
+    return response.data;
+  }
+
+  async getRadarrQueue(): Promise<any> {
+    const response = await this.client.get('/radarr/queue');
+    return response.data;
+  }
+
+  // Prowlarr
+  async getProwlarrIndexers(): Promise<any[]> {
+    const response = await this.client.get('/prowlarr/indexers');
+    return response.data;
+  }
+
+  async getProwlarrStats(): Promise<any> {
+    const response = await this.client.get('/prowlarr/stats');
+    return response.data;
+  }
+
+  async testProwlarrIndexer(indexerId: number): Promise<any> {
+    const response = await this.client.post(`/prowlarr/test/${indexerId}`);
     return response.data;
   }
 }

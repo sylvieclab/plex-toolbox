@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     """Application settings"""
     
     # Project info
-    PROJECT_NAME: str = "Plex Toolbox"
+    PROJECT_NAME: str = "Totarr"
     VERSION: str = "0.1.0"
     ENVIRONMENT: str = "development"
     
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     ]
     
     # Database
-    DATABASE_URL: str = "postgresql://plextoolbox:plextoolbox@db:5432/plextoolbox"
+    DATABASE_URL: str = "postgresql://totarr:totarr@db:5432/totarr"
     
     # Redis (for Celery)
     REDIS_URL: str = "redis://redis:6379/0"

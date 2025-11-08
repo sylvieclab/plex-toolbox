@@ -1,5 +1,5 @@
 {
-  "name": "plex-toolbox-frontend",
+  "name": "totarr-frontend",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -45,5 +45,6 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.11"
-  }
+  },
+  "proxy": "http://localhost:8000"
 }
